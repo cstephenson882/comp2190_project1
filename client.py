@@ -21,6 +21,10 @@ from datetime import datetime
 import time as t
 from random import randint
 
+
+def timestamp():
+  return f">>>  {datetime.now().strftime("%a %H:%M:%S")}\n"
+
 def serverHello():
   """Generates server hello message"""
   status = "100 Hello"
@@ -51,51 +55,70 @@ states=dict()
 # msg   = message being processed
 # state = dictionary containing state variables
 def processMsgs(s, msg, state):
-  t.sleep(1)
+  # t.sleep(1)
   """This function processes messages that are read through the socket. It
      returns a status, which is an integer indicating whether the operation
      was successful."""
+  if not msg:
+    print("No message received.  Exiting")
+    return 0
+  
 
   if msg.startswith("105 Generator + Commitment"):
-    print(f"{msg} : {datetime.now()}")
-    state['expecting'] = "112 Response"
-    #send a message to the client
-    print(f"The value of p in the the 105 Generated string is: {msg.split(',')[-3]}")
-    # this was 
-    c = randint(0, int(msg.split(",")[-3]))
-    print(f"Sending the vlaue of c: {c}")
-    response = ChallengeMsg(c)
-    s.send((response).encode())
-
+       
     state['y'] = int(msg.split(",")[-1])
     state['t'] = int(msg.split(",")[-2])
     state['p'] = int(msg.split(",")[-3])
     state['g'] = int(msg.split(",")[-4][-1])
-    state['c'] = c
-    states=state
+    
+    print (f"105 Generator + Commitment {state['g']}, {state['p']}, {state['t']}, {state['y']}")
+    print(f"{timestamp()}")
+    print(f"response received from the server. 105 Generator + Commitment g={state['g']}, p={state['p']}, t={state['t']}, y=V={state['y']}. \n{timestamp()}") 
 
+    state['c'] = randint(0, int(msg.split(",")[-3]))
+    print(f"Client generates value for 'c' such that 0 <= c < p. \nc = {state['c']} \n{timestamp()}")
+    
+    
+    client_challenge = ChallengeMsg(state['c'] )
+    s.send((client_challenge).encode()) 
+    print(f"Client sends 'Challenge C' to server as '111 Challenge {state['c']}'. Awaiting response... \n{timestamp()}")
+
+    
+    state['expecting'] = "112 Response"  
+    print(f"Client updates its state to expecting '112 Response B' \n{timestamp()}") 
+  
+    states=state
     return 1
   elif msg.startswith("112 Response"):
-    print(f"{msg} : {datetime.now()}")
-    state['expecting'] = "done"
-    #send a message to the client
+    print(f"{msg}  \n{timestamp()}")
+    print(f"112 Response B received from the server, where B={msg.split(' ')[-1]}. \n{timestamp()}")
     
+    #send a message to the client
     z = int(msg.split(" ")[-1])
 
-    compare1 = (state['g']**z)%state['p']
-    compare2 = (state['t']*state['y']**state['c'])%state['p']
+    print (f"Computed the value for 'z = r + cx'. \nz = {z}.\n{timestamp()}")
+
+    client_calculated_commitment = (state['g']**z)%state['p']
+    server_calculated_commitment = (state['t']*state['y']**state['c'])%state['p']
+    
+    print(f"calculated client commitment given by (t * y^c) mod p. Where, t = {state['t']}, y = {state['y']} and p = {state['p']}. c = {state['c']}. \nclient_calculated_commitment = {client_calculated_commitment}") 
+    print(f"calculated server commitment given by (g^z) mod p. Where, g = {state['g']}, z = {z} and p = {state['p']}. \nserver_calculated_commitment = {server_calculated_commitment} \n{timestamp()}")           
+    state['expecting'] = "done"
     states=state
 
     y = state['y']
-    print(f"The value of compare1 is: {compare1} and the value of compare2 is: {compare2} ")
-    if compare1 == compare2:
+
+    if client_calculated_commitment == server_calculated_commitment:
+      print(f"Sucess: Computed commitment matches. '{AllGood()}' status sent to server.  \n{timestamp()}")
       s.send((AllGood()).encode())
       return 0
     else:
+      print(f"Error: Computed commitment does not match. client_calculated_commitment = {client_calculated_commitment}, server_calculated_commitment = {server_calculated_commitment}. '{ErrorCondition()}' status sent to server.\n{timestamp()}")
       s.send((ErrorCondition()).encode())
       return 0
   else:
     s.send((UnexpectedError()).encode())
+    print(f"Unexpected error. '{UnexpectedError()}' status sent to server. \n{timestamp()}")
     return 0
   pass
 
@@ -108,7 +131,7 @@ def main():
   serverHost = str(args[1])  #The remote host
   serverPort = int(args[2])  #The port used by the server
 
-  print(f"Client of ___({serverHost}:{serverPort})___") ## added
+  print(f"Client of Client of Joan A. Smith") ## added
   print("""
   The purpose of this program is to collect two prime numbers from the client, and then
   send them to the server. The server will compute their LCM and send it back to the
@@ -121,13 +144,12 @@ def main():
   client_socket.connect((serverHost, serverPort))
 
   if client_socket:
-    print("The connectionto the server has been established. Timestamp: ",datetime.now().strftime("%H:%M:%S"))
-
-  msg = serverHello()
+    print(f"The connection to the server has been established. \n{timestamp()} ")
 
   #Add code to send data into the socket
-
+  msg = serverHello()
   client_socket.send(msg.encode())
+  print(f"client sends 'hello message' to the server. Awaiting response... \n{timestamp()} ")
 
   while True:
     msg = client_socket.recv(1024).decode()

@@ -25,18 +25,26 @@ will prompt the user for a prime number, 𝑝, of the form 𝑝 = 2𝑞 + 1, whe
 be prompted for a valid generator 𝑔. The server will also generate a random number, 𝑥, that is between
 1 and p"""
 
-def primeValidation(q):
-  # base cases
-  if q == 2 or q == 3 or q == 5 or q == 7 or q == 11:
-    return True
-  
-  if q<=1 or q%2==0 or q%3==0 or q%5==0 or q%7==0 or q%11==0:
-    return False
+def timestamp():
+  return f"timestamp : {datetime.now().strftime("%a>>%H:%M:%S")}"
+
+
+def primeValidation(val):
   #code to validate the prime number 
 
-  for i in range(2,q):
-    if q%i == 0:
-      return False
+  # base cases 1
+  
+  if val == 2 or val == 3 or val == 5 or val == 7 or val == 11:
+    return True
+  
+  # base cases 2
+  elif val<=1 or val%2==0 or val%3==0 or val%5==0 or val%7==0 or val%11==0:
+    return False
+  
+  else:
+    for i in range(2,val):
+      if val%i == 0:
+        return False
   return True
 
 
@@ -45,16 +53,15 @@ def primeValidation(q):
   # 𝑝, must be of the form 2𝑞 + 1, where 
   # 𝑞 is another prime, and 𝑞 divides 𝑝 − 1.
 
-def inputPrime(q):
+def inputPrime(p):
   #added 
   ##primeInputisValidation take a prime number and returns true if the result of 2 
   # multiplied by that prime number plus 1 is a prime number and  𝑞 is another prime, and 𝑞 divides 𝑝 − 1
-  if primeValidation(q):
-    p = 2*q + 1
-    return primeValidation(p) and (p-1)%q == 0
+  if primeValidation(p):
+    q = (p - 1) / 2
+    return primeValidation(q) and (p-1)%q == 0
   else:
     return False
-
 
 
 def PrimeCollect():
@@ -88,13 +95,25 @@ states = dict()
 #msg    = message being processed
 #state  = dictionary containing state variables
 def processMsgs(s, msg, state):
-  """This function processes messages that are read through the socket. 
-  It returns a status, which is an integer indicating whether the operation was successful."""
+  """
+  This function processes messages that are read through the socket. 
+  It returns a status, which is an integer indicating whether the 
+  operation was successful.
+
+  Parameters:
+  s (socket)  : socket
+  msg (string)   : message being processed
+  state (dictionary) : dictionary containing state variables
+
+  Returns:
+  status : integer indicating whether the operation was successful
+  """
   #handle the state when the '100 Hello' message is received
-  t.sleep(1)
+  # t.sleep(1)
   if msg.startswith("100 Hello"):
-    print(f"{msg} : {datetime.now().strftime("%H:%M:%S")}")
+    print(f'{msg}  \n{timestamp()}')
     state['expecting'] = "111 Challenge"
+    
     #send a message to the client
     
     response = clientHello(state['g'], state['p'], state['x'], state['r'])
@@ -102,7 +121,7 @@ def processMsgs(s, msg, state):
     states=state
     return 1
   elif msg.startswith(state['expecting']):
-    print(f"{msg} : {datetime.now().strftime("%H:%M:%S")}")
+    print(f'{msg} \n{timestamp()}')
     state['expecting'] = "Verified"
     state['c'] = int(msg.split(" ")[-1])
     #send a message to the client
@@ -111,7 +130,7 @@ def processMsgs(s, msg, state):
     states=state
     return 1
   elif msg.startswith("220") or msg.startswith("500") or msg.startswith("400"):
-    print(f"{msg} : {datetime.now().strftime("%H:%M:%S")}")
+    print(f'{msg} \n{timestamp()}')
     state['expecting'] = "done"
     states = state
     return 0
@@ -121,10 +140,21 @@ def processMsgs(s, msg, state):
   pass
 
 
-#p is the prime number
-#g is the generator
-#returns true if g creates an list using g**k % p such that the list is equal to [1,2,3,...,p-1] or false otherwise
-def isGenerator(p,g):
+
+def isGenerator(g,p):
+    """
+    Checks whether the given number `g` is a generator for the prime number `p`.
+
+    An integer g is a generator of a prime number, p, if g^k mod p gives all 
+    integers between 1 and p - 1 for k between 1 and p - 1, ie 1,2,3,...,p-1
+
+    Parameters:
+    g (int): The generator.
+    p (int): A prime number.
+
+    Returns:
+    bool: True if `g` is a generator of `p`, False otherwise.
+    """
     between_prime = sorted([i for i in range(1,p)])
     actual_prime = []
     for k in range(1,p):
@@ -142,7 +172,7 @@ def main():
     print ("Please supply a server port.")
     sys.exit()
   
-  HOST = ''              #Symbolic name meaning all available interfaces
+  HOST = '0.0.0.0'              #Symbolic name meaning all available interfaces
   PORT = int(args[1])    #The port on which the server is listening.
 
 
@@ -150,22 +180,27 @@ def main():
     print("Invalid port specified.")
     sys.exit()
 
-  print("Server of _____")
+  device_name = socket.gethostname()
+    
+ 
+  print("Server of",device_name)
 
 
   with socket.socket(AF_INET, SOCK_STREAM) as s:
-    print("Enter a prime number 'q' such that '2*q + 1':: ",end="")
-    q = int(PrimeCollect())
-    while inputPrime(q) == False:
-      print("Invalid Entry. Enter a prime 'q' such that '2*q + 1': ")
-      q = int(PrimeCollect())
+    # print("Enter a prime number 'p' such that 'q' is prime and 'p = 2*q + 1': ")
+    p = int(PrimeCollect())
+    while inputPrime(p) == False:
+      print("Invalid Entry.'p' must be a prime number and of the form 'p = 2*q + 1' where'q' is also prime: ")
+      p = int(PrimeCollect())
 
+    
+    
     g = int(GeneratorCollect())
-    while isGenerator(q,g) == False:
+    while isGenerator(g,p) == False:
       print("Invalid Entry. Enter a generator 'g' such that 'g**k % q' = 1: ",end="")
       g = int(GeneratorCollect())
     
-    p = 2*q + 1
+
     x = randint(1,p)
     r = randint(1,p-1)
     print(f"The secret integer 'x' is {x}")
@@ -181,7 +216,7 @@ def main():
       print("Connected from: ", addr)
       #Process messages received from socket using 
       
-      states = {"expecting": "100 Hello", "g": g, "p": p, "x": x, "r": r} 
+      states = {"server": "server", "expecting": "100 Hello", "g": g, "p": p, "x": x, "r": r} 
       while True:
         msg = conn.recv(1024).decode()
         if not processMsgs(conn, msg, state = states):
