@@ -23,6 +23,7 @@ from random import randint
 
 
 def timestamp():
+  # t.sleep(1)
   return f">>>  {datetime.now().strftime("%a %H:%M:%S")}\n"
 
 def serverHello():
@@ -65,21 +66,24 @@ def processMsgs(s, msg, state):
   
 
   if msg.startswith("105 Generator + Commitment"):
-       
-    state['y'] = int(msg.split(",")[-1])
-    state['t'] = int(msg.split(",")[-2])
-    state['p'] = int(msg.split(",")[-3])
-    state['g'] = int(msg.split(",")[-4][-1])
+    msg_split =  msg[27:].split(",")
+  
+    state['g'] = int(msg_split[0])
+    state['p'] = int(msg_split[1])
+    state['t'] = int(msg_split[2])
+    state['y'] = int(msg_split[3])
     
     print (f"105 Generator + Commitment {state['g']}, {state['p']}, {state['t']}, {state['y']}")
     print(f"{timestamp()}")
     print(f"response received from the server. 105 Generator + Commitment g={state['g']}, p={state['p']}, t={state['t']}, y=V={state['y']}. \n{timestamp()}") 
 
-    state['c'] = randint(0, int(msg.split(",")[-3]))
+   
+    state['c'] = randint(0, state['p']-1)
     print(f"Client generates value for 'c' such that 0 <= c < p. \nc = {state['c']} \n{timestamp()}")
     
     
     client_challenge = ChallengeMsg(state['c'] )
+    # client_challenge = f"111 Challenge {[i for i in range(1,state['p'])][randint(0,state['p']-1)]}"
     s.send((client_challenge).encode()) 
     print(f"Client sends 'Challenge C' to server as '111 Challenge {state['c']}'. Awaiting response... \n{timestamp()}")
 
@@ -131,7 +135,7 @@ def main():
   serverHost = str(args[1])  #The remote host
   serverPort = int(args[2])  #The port used by the server
 
-  print(f"Client of Client of Joan A. Smith") ## added
+  print(f"Client of Client of {socket.gethostname()}") ## added
   print("""
   The purpose of this program is to collect two prime numbers from the client, and then
   send them to the server. The server will compute their LCM and send it back to the
@@ -141,10 +145,14 @@ def main():
   """) 
   #Add code to initialize the socket
   client_socket = socket.socket(AF_INET, SOCK_STREAM)
-  client_socket.connect((serverHost, serverPort))
+  try:
+    client_socket.connect((serverHost, serverPort))
+  except:
+    print(f"Could not connect to the server on port {serverPort}. \n{timestamp()} ")
+    sys.exit()
 
   if client_socket:
-    print(f"The connection to the server has been established. \n{timestamp()} ")
+    print(f"The connection to the server has been established on port {serverPort}. \n{timestamp()} ")
 
   #Add code to send data into the socket
   msg = serverHello()

@@ -10,13 +10,5 @@ else:
     print("No server running")
 
 
-# from NumTheory import NumTheory
-# r= 0
-# g = 3
-# p = 11
 
-# print(str(NumTheory.expMod(g,r,p)))
-
-
-# print(g**r % p)
 

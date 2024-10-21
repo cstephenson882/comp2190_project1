@@ -26,26 +26,29 @@ be prompted for a valid generator 𝑔. The server will also generate a random n
 1 and p"""
 
 def timestamp():
-  return f"timestamp : {datetime.now().strftime("%a>>%H:%M:%S")}"
-
+  # t.sleep(1)
+  return f">>>  {datetime.now().strftime("%a %H:%M:%S")}\n"
 
 def primeValidation(val):
-  #code to validate the prime number 
-
-  # base cases 1
-  
-  if val == 2 or val == 3 or val == 5 or val == 7 or val == 11:
-    return True
-  
-  # base cases 2
-  elif val<=1 or val%2==0 or val%3==0 or val%5==0 or val%7==0 or val%11==0:
-    return False
-  
-  else:
-    for i in range(2,val):
-      if val%i == 0:
-        return False
+  """
+    primeValidation takes a prime number as input
+    
+    Parameters:
+    val (int): prime number
+    
+    Returns:
+    Boolean: True if val is prime number and False otherwise
+  """
+  if val < 1:
+      return False 
+  if val == 2 or val == 3:
+      return True
+  for i in range(3,val//2+1):
+      if val%i==0:
+          return False
   return True
+      
+
 
 
 #inputPrime(q)
@@ -57,11 +60,28 @@ def inputPrime(p):
   #added 
   ##primeInputisValidation take a prime number and returns true if the result of 2 
   # multiplied by that prime number plus 1 is a prime number and  𝑞 is another prime, and 𝑞 divides 𝑝 − 1
-  if primeValidation(p):
-    q = (p - 1) / 2
-    return primeValidation(q) and (p-1)%q == 0
+  #check if p is and whole number 
+  """
+  inputPrime takes a prime number as input
+
+  Parameters:
+  p (int): prime number
+
+  Returns:
+  Boolean: True if p is a prime number and q is another prime where q divides p-1 and q = (p-1)/2. False otherwise"""
+  if p < 127 or p > 7919:
+      print("Invalid entry. The Prime number must be between 127 and 7919")
+      return False
+  q = (p-1)/2
+  if int(q) == q:
+      q = int(q)
+      return primeValidation(p) and  primeValidation(q) and (p-1)%q == 0
+       
   else:
     return False
+  
+  
+     
 
 
 def PrimeCollect():
@@ -112,25 +132,38 @@ def processMsgs(s, msg, state):
   # t.sleep(1)
   if msg.startswith("100 Hello"):
     print(f'{msg}  \n{timestamp()}')
-    state['expecting'] = "111 Challenge"
-    
+        
     #send a message to the client
-    
     response = clientHello(state['g'], state['p'], state['x'], state['r'])
     s.send(response.encode())
+    print(f'100 Hello message received. \nserver generates response: {response}')
+    print(f"response sent to the client...\n{timestamp()}")
+
+    state['expecting'] = "111 Challenge"
+    print(f"server updates its state to expecting '{state['expecting']}' \n{timestamp()}")
     states=state
     return 1
   elif msg.startswith(state['expecting']):
     print(f'{msg} \n{timestamp()}')
-    state['expecting'] = "Verified"
+
     state['c'] = int(msg.split(" ")[-1])
+    print(f"server receieves 111 Challenge C from the client, where C = {state['c']} \n{timestamp()}")
+    state['expecting'] = "220 500 400"
+    
     #send a message to the client
     response = genChallengeResponse(state['r'], state['x'], state['c'])
     s.send(response.encode())
+    
+    print(f"Server generates '112 Response B' and sends it to the client., where B = {response.split(" ")[-1]} \n{timestamp()}")
+
+    print(f"server awaiting client's status...\n{timestamp()}")
     states=state
     return 1
-  elif msg.startswith("220") or msg.startswith("500") or msg.startswith("400"):
+  elif msg[:3] in state['expecting'].split(" "):
+    status_meaning = {"220":"Success, client's commitment matches server's commitment", "400": "Error, client's commitment does not match server's commitment", "500": "Bad request. The server received and unexpected message"}
     print(f'{msg} \n{timestamp()}')
+
+    print(f"server receives 'status {msg[:3]}' from the client. \nInterpretation: {status_meaning[msg[:3]]} \n{timestamp()}")
     state['expecting'] = "done"
     states = state
     return 0
@@ -138,6 +171,7 @@ def processMsgs(s, msg, state):
     return 0
 
   pass
+
 
 
 
@@ -156,12 +190,13 @@ def isGenerator(g,p):
     bool: True if `g` is a generator of `p`, False otherwise.
     """
     between_prime = sorted([i for i in range(1,p)])
-    actual_prime = []
+    gernerator_accumulation = []
     for k in range(1,p):
         check = (g**k) % p
-        actual_prime.append(check) 
-    actual_prime = sorted(actual_prime)
-    return actual_prime == between_prime
+        gernerator_accumulation.append(check) 
+    gernerator_accumulation = sorted(gernerator_accumulation)
+    # print(f"gernerator_accumulation: {gernerator_accumulation}")
+    return gernerator_accumulation == between_prime
 
 def main():
   
@@ -187,35 +222,45 @@ def main():
 
 
   with socket.socket(AF_INET, SOCK_STREAM) as s:
-    # print("Enter a prime number 'p' such that 'q' is prime and 'p = 2*q + 1': ")
-    p = int(PrimeCollect())
+    p = 0
+    try:
+      p = int(PrimeCollect())
+    except ValueError:
+      pass
+
     while inputPrime(p) == False:
-      print("Invalid Entry.'p' must be a prime number and of the form 'p = 2*q + 1' where'q' is also prime: ")
+      print(f"Enter 'p' such that 'p = 2*q + 1' where'q' is also prime:\n\nRe",end="")
       p = int(PrimeCollect())
 
     
     
     g = int(GeneratorCollect())
     while isGenerator(g,p) == False:
-      print("Invalid Entry. Enter a generator 'g' such that 'g**k % q' = 1: ",end="")
+      print(f"Invalid Entry. Enter a generator 'g' such that 'g**k % p' produces 1,2,3,...,p-1 for k between 1 and p-1.\n{timestamp()}")
       g = int(GeneratorCollect())
     
-
+    if g and p:
+      print(f"\nInput stored.The values are: 'g' = {g} and 'p' = {p} \n{timestamp()}")
     x = randint(1,p)
-    r = randint(1,p-1)
-    print(f"The secret integer 'x' is {x}")
+    r = randint(1,p)
+    
+
+    print(f"The server has generated the random values 'x' and 'r' such that 1>=x<=p and 1>=r<=p \n  x = {x} \n  r = {r} \n{timestamp()}")
 
     # Bind socket
     # listen 
     s.bind((HOST, PORT)) ##aded 
     s.listen(1) #added
+    print(f"Server listening on port {PORT}...")
 
     conn, addr = s.accept() ##added # accept connections using socket
     
+    client_count = 0
     with conn:
-      print("Connected from: ", addr)
+      print(f"Client_{client_count} connected from:", addr)
+      print(timestamp())
+
       #Process messages received from socket using 
-      
       states = {"server": "server", "expecting": "100 Hello", "g": g, "p": p, "x": x, "r": r} 
       while True:
         msg = conn.recv(1024).decode()
